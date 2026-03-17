@@ -143,7 +143,9 @@ def test_experiment_numeric_precision_offset(tmp_path):
         assert res is not None
 
 
-def test_experiment_multi_device_interpolation(tmp_path):
+@pytest.mark.parametrize("return_valid", [False, True])
+@pytest.mark.parametrize("device", [None, "device_0"])
+def test_experiment_multi_device_interpolation(tmp_path, return_valid, device):
     """Check data consistency when interpolating across multiple modalities."""
     with create_experiment(tmp_path, n_devices=2) as experiment_path:
         exp = Experiment(
@@ -151,8 +153,30 @@ def test_experiment_multi_device_interpolation(tmp_path):
         )
 
         times = np.array([1.0, 2.0])
-        results = exp.interpolate(times, device=None)
+        results = exp.interpolate(times, device=device, return_valid=return_valid)
 
-        assert isinstance(results, dict)
-        assert "device_0" in results and "device_1" in results
-        assert results["device_0"].shape == (2, 10)
+        # 1. If return_valid=True, it should return a tuple of (data, valid_indices)
+        if return_valid:
+            data, valid_idx = results
+            if device is None:
+                assert isinstance(data, dict) and isinstance(valid_idx, dict)
+                assert "device_0" in data and "device_1" in data
+                assert data["device_0"].shape == (2, 10)
+                assert valid_idx["device_0"].shape == (2,)
+            else:
+                assert isinstance(data, np.ndarray) and isinstance(
+                    valid_idx, np.ndarray
+                )
+                assert data.shape == (2, 10)
+                assert valid_idx.shape == (2,)
+
+        # 2. If return_valid=False, it should just return the data
+        else:
+            data = results
+            if device is None:
+                assert isinstance(data, dict)
+                assert "device_0" in data and "device_1" in data
+                assert data["device_0"].shape == (2, 10)
+            else:
+                assert isinstance(data, np.ndarray)
+                assert data.shape == (2, 10)

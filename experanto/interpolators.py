@@ -115,6 +115,7 @@ class Interpolator:
         ValueError
             If the modality type is not supported.
         """
+        root_folder = str(root_folder)
         with open(Path(root_folder) / "meta.yml", "r") as file:
             meta_data = yaml.safe_load(file)
         modality = meta_data.get("modality")

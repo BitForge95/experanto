@@ -75,6 +75,7 @@ class Experiment:
         self._load_devices()
 
     def _load_devices(self) -> None:
+        # Populate devices by going through subfolders
         # Assumption: blocks are sorted by start time
         device_folders = [d for d in self.root_folder.iterdir() if d.is_dir()]
 
@@ -84,15 +85,19 @@ class Experiment:
                 continue
             logger.info("Parsing %s data", d.name)
 
+            # Get interpolation config for this device
             interp_conf = self.modality_config[d.name]["interpolation"]
 
             if (
                 isinstance(interp_conf, (dict, DictConfig))
                 and "_target_" in interp_conf
             ):
+                # Custom interpolator (Hydra instantiates it)
                 dev = instantiate(
                     interp_conf, root_folder=d, cache_data=self.cache_data
                 )
+
+                # Check if instantiated object is proper Interpolator
                 if not isinstance(dev, Interpolator):
                     raise ValueError(
                         "Instantiated object must inherit from Interpolator class."
@@ -102,8 +107,13 @@ class Experiment:
                 dev = interp_conf
 
             else:
+                # Default back to original logic
+                warnings.warn(
+                    "Falling back to original Interpolator creation logic.",
+                    UserWarning,
+                )
                 dev = Interpolator.create(
-                    str(d),
+                    d,
                     cache_data=self.cache_data,
                     **{str(k): v for k, v in dict(interp_conf).items()},
                 )
