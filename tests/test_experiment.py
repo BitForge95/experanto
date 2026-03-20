@@ -4,11 +4,11 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 from experanto.experiment import Experiment
 from experanto.interpolators import Interpolator
-from hypothesis import given, settings, strategies as st
-from hypothesis import HealthCheck
 
 from .create_experiment import (
     get_default_config,
@@ -304,12 +304,12 @@ def test_experiment_start_end_time_reflects_union(
             ),
         )
 
-    assert experiment.start_time == (expected_start), (
-        f"Expected start_time={expected_start}, got {experiment.start_time}"
-    )
-    assert experiment.end_time == (expected_end), (
-        f"Expected end_time={expected_end}, got {experiment.end_time}"
-    )
+    assert experiment.start_time == (
+        expected_start
+    ), f"Expected start_time={expected_start}, got {experiment.start_time}"
+    assert experiment.end_time == (
+        expected_end
+    ), f"Expected end_time={expected_end}, got {experiment.end_time}"
 
 
 # Safety check
@@ -403,12 +403,12 @@ def test_experiment_skips_invalid_devices(tmp_path, override_meta, caplog):
     assert "valid_device" in experiment.devices
     assert "invalid_device" not in experiment.devices
 
-    assert experiment.start_time == (start_val), (
-        f"Expected start_time={start_val}, got {experiment.start_time}"
-    )
-    assert experiment.end_time == (end_val), (
-        f"Expected end_time={end_val}, got {experiment.end_time}"
-    )
-    assert any("invalid_device" in message for message in caplog.messages), (
-        "Expected warning about invalid_device was skipped"
-    )
+    assert experiment.start_time == (
+        start_val
+    ), f"Expected start_time={start_val}, got {experiment.start_time}"
+    assert experiment.end_time == (
+        end_val
+    ), f"Expected end_time={end_val}, got {experiment.end_time}"
+    assert any(
+        "invalid_device" in message for message in caplog.messages
+    ), "Expected warning about invalid_device was skipped"

@@ -49,7 +49,9 @@ def setup_test_experiment(
 
         for device_id, device_kwargs in enumerate(devices_kwargs):
             device_path = tmp_path / f"device_{device_id}"
-            _generate_sequence_data(str(device_path), **device_kwargs)  # pyright: ignore
+            _generate_sequence_data(
+                str(device_path), **device_kwargs
+            )  # pyright: ignore
 
         yield tmp_path
     finally:
@@ -108,12 +110,12 @@ def make_modality_config(*device_names, sampling_rates=None, offsets=None):
     elif isinstance(offsets, (int, float)):
         offsets = [offsets] * len(device_names)
 
-    assert len(device_names) == len(sampling_rates), (
-        f"sampling_rates length {len(sampling_rates)} does not match device_names length {len(device_names)}"
-    )
-    assert len(device_names) == len(offsets), (
-        f"offsets length {len(offsets)} does not match device_names length {len(device_names)}"
-    )
+    assert len(device_names) == len(
+        sampling_rates
+    ), f"sampling_rates length {len(sampling_rates)} does not match device_names length {len(device_names)}"
+    assert len(device_names) == len(
+        offsets
+    ), f"offsets length {len(offsets)} does not match device_names length {len(device_names)}"
 
     return {
         name: {"interpolation": {"sampling_rate": sr, "offset": off}}
