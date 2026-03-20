@@ -28,6 +28,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
+    "myst_parser",
 ]
 
 # -- Autosummary settings ----------------------------------------------------
@@ -77,7 +78,6 @@ autodoc_mock_imports = [
     "cv2",
     "pandas",
     "hydra",
-    "omegaconf",
     "jaxtyping",
     "plotly",
     "optree",
