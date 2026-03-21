@@ -31,13 +31,14 @@ def get_default_config():
 
 
 @contextmanager
-def create_experiment(
+def setup_test_experiment(
     tmp_path,
     n_devices=2,
     devices_kwargs=None,
+    default_sampling_rate=1.0,
 ):
     devices_kwargs = devices_kwargs or [{}] * n_devices
-    default_params = {"sampling_rate": 1.0}
+    default_params = {"sampling_rate": default_sampling_rate}
 
     devices_kwargs = [default_params | kwargs for kwargs in devices_kwargs]
 

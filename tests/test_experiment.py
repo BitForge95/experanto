@@ -7,12 +7,14 @@ import pytest
 
 from experanto.experiment import Experiment
 from experanto.interpolators import Interpolator
+from hypothesis import given, settings, strategies as st
+from hypothesis import HealthCheck
 
 from .create_experiment import (
-    create_experiment,
     get_default_config,
     make_modality_config,
     make_sequence_device,
+    setup_test_experiment,
 )
 
 
@@ -73,17 +75,31 @@ def test_experiment_interpolate_routing(tmp_path, mock_interpolator):
 
 
 @pytest.mark.parametrize(
-    "device_name, start_t, end_t", [("device_0", 0.0, 10.0), ("device_1", 0.0, 20.0)]
+    "device_name, start_t, end_t",
+    [("device_0", 0.0, 10.0), ("device_1", 0.0, 20.0), ("device_2", 5.0, 15.0)],
 )
 def test_get_valid_range_all_devices(tmp_path, device_name, start_t, end_t):
     """Integration test for valid_interval propagation from disk to object."""
-    with create_experiment(
+    with setup_test_experiment(
         tmp_path,
-        devices_kwargs=[{"t_end": 10.0}, {"t_end": 20.0}],
+        n_devices=3,
+        devices_kwargs=[
+            {"t_end": 10.0},
+            {"t_end": 20.0},
+            {"start_time": 5.0, "t_end": 15.0},
+        ],
     ) as experiment_path:
+        # Get base config and explicitly duplicate the settings for device_2
+        config = get_default_config()
+        config["device_2"] = {
+            "sampling_rate": 1.0,
+            "chunk_size": 40,
+            "interpolation": {"interpolation_mode": "nearest_neighbor"},
+        }
+
         experiment = Experiment(
             root_folder=str(experiment_path),
-            modality_config=get_default_config(),
+            modality_config=config,
         )
 
         valid_range = experiment.get_valid_range(device_name)
@@ -92,7 +108,7 @@ def test_get_valid_range_all_devices(tmp_path, device_name, start_t, end_t):
 
 
 def test_get_valid_range_raises_for_invalid_device(tmp_path):
-    with create_experiment(tmp_path) as experiment_path:
+    with setup_test_experiment(tmp_path) as experiment_path:
         experiment = Experiment(
             root_folder=str(experiment_path),
             modality_config=get_default_config(),
@@ -105,7 +121,7 @@ def test_experiment_with_non_zero_start_time(tmp_path):
     """Test boundary conditions for data not starting at t=0."""
     start_offset, duration = 1.5, 10.0
 
-    with create_experiment(
+    with setup_test_experiment(
         tmp_path,
         n_devices=1,
         devices_kwargs=[{"t_end": start_offset + duration, "start_time": start_offset}],
@@ -115,18 +131,26 @@ def test_experiment_with_non_zero_start_time(tmp_path):
             modality_config=get_default_config(),
         )
 
-        # Confirm interpolation doesn't crash at the offset start
-        res = experiment.interpolate(np.array([start_offset]), device="device_0")
+        # Query inside boundary
+        res = experiment.interpolate(np.array([start_offset + 1.0]), device="device_0")
         assert res is not None
 
+        # Query outside boundary should throw a warning
+        with pytest.warns(UserWarning, match="no valid times queried"):
+            experiment.interpolate(np.array([start_offset - 1.0]), device="device_0")
 
-def test_experiment_numeric_precision_offset(tmp_path):
+
+@given(
+    start_offset=st.floats(min_value=0.0, max_value=100.0),
+    sampling_rate=st.floats(min_value=0.1, max_value=100.0),
+    duration=st.floats(min_value=0.0, max_value=100.0),
+)
+@settings(deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_experiment_numeric_precision_offset(
+    tmp_path, start_offset, sampling_rate, duration
+):
     """Stress test using non-integer rates and offsets to catch float drift."""
-    start_offset = 0.123456789
-    sampling_rate = 33.3333333
-    duration = 1.0
-
-    with create_experiment(
+    with setup_test_experiment(
         tmp_path,
         n_devices=1,
         devices_kwargs=[
@@ -154,7 +178,7 @@ def test_experiment_numeric_precision_offset(tmp_path):
 @pytest.mark.parametrize("device", [None, "device_0"])
 def test_experiment_multi_device_interpolation(tmp_path, return_valid, device):
     """Check data consistency when interpolating across multiple modalities."""
-    with create_experiment(tmp_path, n_devices=2) as experiment_path:
+    with setup_test_experiment(tmp_path, n_devices=2) as experiment_path:
         exp = Experiment(
             root_folder=str(experiment_path), modality_config=get_default_config()
         )
@@ -196,6 +220,8 @@ DEVICE_TIME_RANGE_CASES = [
     ([(1.0, 8.0), (0.0, 10.0)], 0.0, 10.0),
     # Three devices with different ranges: start should be min, end should be max
     ([(0.0, 10.0), (1.0, 8.0), (2.0, 9.0)], 0.0, 10.0),
+    # Union is actually a union and not just the longest device
+    ([(1.0, 4.0), (3.0, 8.0), (2.0, 9.0)], 1.0, 9.0),
     # Devices with non-overlapping ranges: start should be min, end should be max
     ([(0.0, 3.0), (7.0, 8.0)], 0.0, 8.0),
     # Devices with identical ranges: start and end should match that range
@@ -208,6 +234,7 @@ DEVICE_TIME_RANGE_IDS = [
     "single_device",
     "two_devices_different_ranges",
     "three_devices_different_ranges",
+    "true_union_different_ranges",
     "non_overlapping_ranges",
     "identical_ranges",
     "large_time_stamps",
